@@ -31,5 +31,5 @@ A **beautiful and fast** movie recommendation web app built with **FastAPI** bac
 
 ### 1. Clone / Download Project
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Shu0209/Movie_Recommendation
 cd cinematch
