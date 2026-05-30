@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 
 movie_env/
 
+=======
+>>>>>>> fa8304ac296555c5be05659cf1dcfbf871bafcc9
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
