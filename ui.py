@@ -1,5 +1,5 @@
 """
-Balanced Movie Recommender UI - Clean & Modern
+CineMatch — Redesigned Streamlit UI (Fixed)
 """
 
 import requests
@@ -12,176 +12,314 @@ st.set_page_config(
     page_title="CineMatch",
     page_icon="🎬",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# ── Custom CSS (Light Touch) ───────────────────────────────────────────────────
+# ── Custom CSS ─────────────────────────────────────────────────────────────────
 st.markdown("""
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
 <style>
-    .main-header {
-        font-size: 2.8rem;
-        font-weight: 700;
-        color: #e8c547;
-        margin-bottom: 0.5rem;
-    }
-    .sub-header {
-        font-size: 1.1rem;
-        color: #aaaaaa;
-        margin-bottom: 2rem;
-    }
-    .movie-card {
-        background-color: #1e1e2e;
-        border-radius: 12px;
-        padding: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
-    }
-    .movie-card:hover {
-        transform: translateY(-5px);
-    }
-    .stButton>button {
-        height: 52px;
-        font-size: 1.1rem;
-    }
+/* Base */
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: #080810 !important;
+    color: #d8d8e8;
+    font-family: 'DM Sans', sans-serif;
+}
+[data-testid="stMain"] { background-color: #080810 !important; }
+[data-testid="block-container"] { padding: 2rem 3rem; }
+
+/* Hero */
+.hero-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 0.2rem;
+}
+.hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4.2rem;
+    letter-spacing: 0.06em;
+    color: #ffffff;
+    line-height: 1;
+}
+.hero-dot { color: #e8c547; font-size: 4rem; }
+.hero-sub {
+    font-size: 0.82rem;
+    font-weight: 300;
+    letter-spacing: 0.22em;
+    color: #666688;
+    text-transform: uppercase;
+}
+
+/* Tabs */
+[data-testid="stTabs"] > div:first-child {
+    border-bottom: 1px solid #1e1e30;
+    margin-bottom: 2rem;
+}
+[data-testid="stTabs"] button {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: #555570 !important;
+    padding: 0.8rem 1.6rem !important;
+    border-bottom: 2px solid transparent !important;
+}
+[data-testid="stTabs"] button[aria-selected="true"] {
+    color: #e8c547 !important;
+    border-bottom: 2px solid #e8c547 !important;
+}
+
+/* Inputs */
+[data-testid="stTextInput"] input {
+    background-color: #0e0e1c !important;
+    border: 1px solid #1e1e30 !important;
+    border-radius: 4px !important;
+    color: #d8d8e8 !important;
+    padding: 0.75rem 1rem !important;
+}
+[data-testid="stTextInput"] input:focus {
+    border-color: #e8c547 !important;
+    box-shadow: 0 0 0 2px rgba(232, 197, 71, 0.2) !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background: #e8c547 !important;
+    color: #080810 !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase;
+    padding: 0.75rem !important;
+    border-radius: 4px !important;
+}
+.stButton > button:hover {
+    background: #f0d060 !important;
+    transform: translateY(-1px);
+}
+
+/* Movie Cards */
+.movie-card {
+    background: #0e0e1c;
+    border: 1px solid #1a1a2e;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: all 0.25s;
+    height: 100%;
+}
+.movie-card:hover {
+    border-color: #e8c547;
+    transform: translateY(-4px);
+}
+.movie-card img {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+}
+.movie-card-body { padding: 12px; }
+.movie-card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin: 0 0 6px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.movie-card-meta {
+    font-size: 0.78rem;
+    color: #666688;
+    display: flex;
+    justify-content: space-between;
+}
+.movie-card-score { color: #e8c547; font-weight: 600; }
+
+/* Result Rows */
+.result-row {
+    display: flex;
+    gap: 16px;
+    padding: 14px;
+    background: #0e0e1c;
+    border: 1px solid #1a1a2e;
+    border-radius: 6px;
+    margin-bottom: 12px;
+}
+.result-row:hover { border-color: #e8c54760; }
+.result-row img { width: 60px; border-radius: 4px; flex-shrink: 0; }
+
+/* Other */
+.section-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #e8c547;
+    margin: 1.5rem 0 0.8rem 0;
+}
+hr { border-color: #1e1e30 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── API Helper ─────────────────────────────────────────────────────────────────
-def api_call(path: str, params: dict = None):
+# ── API Helper ─────────────────────────────────────────────────────────────
+def api(path: str, params: dict = None):
     try:
         r = requests.get(f"{API_BASE}{path}", params=params, timeout=60)
         if r.status_code == 200:
             return r.json()
         st.error(f"API Error: {r.status_code}")
+        return None
     except requests.exceptions.ConnectionError:
-        st.error("❌ Backend not running. Start FastAPI on http://localhost:8000")
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Timeout - Try fewer recommendations or disable posters")
+        st.error("❌ Cannot connect to backend. Make sure FastAPI is running on http://localhost:8000")
+        return None
     except Exception as e:
         st.error(f"Error: {e}")
-    return None
+        return None
 
+PLACEHOLDER = "https://via.placeholder.com/200x300/0e0e1c/555577?text=No+Poster"
 
-def get_poster(url):
-    return url if url else "https://via.placeholder.com/200x300/2a2a2a/aaaaaa?text=No+Poster"
+def poster(url):
+    return url if url and url != "N/A" else PLACEHOLDER
 
+# ── Hero ───────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="hero-wrap">
+    <span class="hero-title">CineMatch</span>
+    <span class="hero-dot">·</span>
+</div>
+<div class="hero-sub">Powered by OMDB &nbsp;✦&nbsp; TF-IDF</div>
+""", unsafe_allow_html=True)
 
-#  Header 
-st.markdown('<h1 class="main-header">CineMatch</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Discover your next favorite movie</p>', unsafe_allow_html=True)
+# ── Tabs ───────────────────────────────────────────────────────────────────────
+tab_rec, tab_search, tab_lookup = st.tabs(["Recommendations", "Search", "Lookup"])
 
-#  Tabs
-tab1, tab2, tab3 = st.tabs(["🎯 Recommendations", "🔍 Search", "🎞 Movie Lookup"])
-
-
-#  TAB 1: RECOMMENDATIONS
-
-with tab1:
-    col1, col2 = st.columns([5, 2])
-    with col1:
-        title = st.text_input("Enter a movie you enjoyed", placeholder="Inception, Interstellar, The Dark Knight", key="rec_input")
-    with col2:
-        go = st.button("Get Recommendations", type="primary", use_container_width=True)
-
-    c1, c2, c3 = st.columns([2, 2, 3])
-    with c1:
-        top_n = st.slider("How many recommendations?", 5, 20, 10)
-    with c2:
-        enrich = st.toggle("Show Posters", value=True)
-    with c3:
-        mode = st.radio("Mode", ["Bundle (Best)", "TF-IDF Only"], horizontal=True)
-
-    if go and title.strip():
-        with st.spinner("Finding similar movies..."):
-            if mode == "Bundle (Best)":
-                data = api_call("/recommend/bundle", {"title": title.strip(), "top_n": top_n})
-                if data:
-                    if data.get("movie_details"):
-                        d = data["movie_details"]
-                        st.subheader(f"🎬 {d.get('title')} ({d.get('year')})")
-                        col_a, col_b = st.columns([2, 5])
-                        with col_a:
-                            st.image(get_poster(d.get("poster_url")), width=180)
-                        with col_b:
-                            st.write(f"⭐ **{d.get('imdb_rating')}** | {d.get('runtime')}")
-                            st.write(f"**Genre:** {d.get('genre')}")
-                            st.write(d.get("plot", ""))
-                        st.divider()
-
-                    recs = data.get("tfidf_recommendations", [])
-                    if recs:
-                        st.subheader(f"Recommended because you liked **{title}**")
-                        cols = st.columns(5)
-                        for i, rec in enumerate(recs):
-                            omdb = rec.get("omdb") or {}
-                            with cols[i % 5]:
-                                st.image(get_poster(omdb.get("poster_url")), use_container_width=True)
-                                st.markdown(f"**{omdb.get('title') or rec['title']}**")
-                                st.caption(f"Score: {rec['score']:.3f} • {omdb.get('year','')}")
-            else:
-                recs = api_call("/recommend/tfidf", {
-                    "title": title.strip(), "top_n": top_n, "enrich": enrich
-                })
-                if recs:
-                    st.subheader(f"Similar to **{title}**")
-                    cols = st.columns(5)
-                    for i, rec in enumerate(recs):
-                        omdb = rec.get("omdb") or {}
-                        with cols[i % 5]:
-                            if enrich:
-                                st.image(get_poster(omdb.get("poster_url")), use_container_width=True)
-                            st.markdown(f"**{omdb.get('title') or rec['title']}**")
-                            st.caption(f"Score: {rec['score']:.3f}")
-
-
-#  TAB 2: SEARCH
-
-with tab2:
-    col1, col2 = st.columns([5, 2])
-    with col1:
-        query = st.text_input("Search any movie or series", placeholder="The Batman", key="search_input")
-    with col2:
-        search_btn = st.button("Search", use_container_width=True)
-
-    if search_btn and query.strip():
-        with st.spinner("Searching..."):
-            results = api_call("/search", {"query": query.strip(), "page": 1})
-            if results:
-                cols = st.columns(4)
-                for i, item in enumerate(results):
-                    with cols[i % 4]:
-                        st.image(get_poster(item.get("poster_url")), use_container_width=True)
-                        st.write(f"**{item.get('title')}**")
-                        st.caption(f"{item.get('year')} • {item.get('type')}")
-
-
-#  TAB 3: MOVIE LOOKUP
-
-with tab3:
-    lookup_mode = st.radio("Lookup by", ["Title", "IMDb ID"], horizontal=True)
+# ====================== RECOMMENDATIONS ======================
+with tab_rec:
+    st.markdown('<div class="section-label">Find Similar Movies</div>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([5, 2])
+    col1, col2 = st.columns([6, 1], gap="small")
     with col1:
-        value = st.text_input(
-            "Enter Title or IMDb ID", 
-            placeholder="Oppenheimer" if lookup_mode == "Title" else "tt15398776"
-        )
+        rec_title = st.text_input("Enter movie title", 
+                                  placeholder="Inception, Parasite, Dune...", 
+                                  key="rec_input")
     with col2:
-        lookup_btn = st.button("Get Details", use_container_width=True)
+        rec_go = st.button("Search", type="primary", key="rec_btn")
 
-    if lookup_btn and value.strip():
-        with st.spinner("Fetching movie info..."):
-            if lookup_mode == "Title":
-                data = api_call(f"/movie/title/{value.strip()}")
+    if rec_go and rec_title.strip():
+        with st.spinner("Fetching recommendations..."):
+            data = api("/recommend/bundle", {"title": rec_title.strip(), "top_n": 12})
+
+        if data:
+            movie = data.get("movie_details", {})
+            if movie:
+                st.success(f"**{movie.get('title')}** ({movie.get('year', '')})")
+                if movie.get("plot"):
+                    st.caption(movie["plot"][:280] + "...")
+
+            recs = data.get("tfidf_recommendations", [])
+            if recs:
+                st.markdown(f'<div class="section-label">Because you liked <b>{rec_title}</b></div>', 
+                           unsafe_allow_html=True)
+                
+                cols = st.columns(4, gap="small")
+                for i, rec in enumerate(recs[:12]):
+                    omdb = rec.get("omdb") or {}
+                    title = omdb.get("title") or rec.get("title", "Unknown")
+                    with cols[i % 4]:
+                        st.markdown(f"""
+                        <div class="movie-card">
+                            <img src="{poster(omdb.get('poster_url'))}" alt="{title}">
+                            <div class="movie-card-body">
+                                <div class="movie-card-title">{title}</div>
+                                <div class="movie-card-meta">
+                                    <span>{omdb.get('year', '')}</span>
+                                    <span class="movie-card-score">↑ {rec.get('score', 0):.2f}</span>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
             else:
-                data = api_call(f"/movie/imdb/{value.strip()}")
-            
-            if data:
-                st.image(get_poster(data.get("poster_url")), width=220)
-                st.subheader(f"{data.get('title')} ({data.get('year')})")
-                st.write(f"⭐ **{data.get('imdb_rating')}**   |   {data.get('runtime')}   |   {data.get('genre')}")
-                st.write(f"**Director:** {data.get('director')}")
-                st.write(f"**Cast:** {data.get('actors')}")
-                st.write("**Plot:**")
-                st.write(data.get("plot", "No plot available."))
+                st.info("No recommendations found.")
+    else:
+        st.info("Enter a movie title to get recommendations.")
 
+# ====================== SEARCH ======================
+with tab_search:
+    st.markdown('<div class="section-label">Search Movies & Series</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([6, 1], gap="small")
+    with col1:
+        query = st.text_input("Search", 
+                              placeholder="The Matrix, Breaking Bad...", 
+                              key="search_input")
+    with col2:
+        search_go = st.button("Search", type="primary", key="search_btn")
+
+    if search_go and query.strip():
+        with st.spinner("Searching OMDB..."):
+            results = api("/search", {"query": query.strip(), "page": 1})
+
+        if results:
+            for item in results:
+                imdb_id = item.get("imdb_id", "")
+                st.markdown(f"""
+                <div class="result-row">
+                    <img src="{poster(item.get('poster_url'))}" alt="{item.get('title')}">
+                    <div>
+                        <div style="font-weight:600; font-size:0.98rem;">{item.get('title', 'Unknown')}</div>
+                        <div style="color:#666688; font-size:0.82rem;">
+                            {item.get('year', '')} • {item.get('type','movie').capitalize()}
+                            {f'• <a href="https://www.imdb.com/title/{imdb_id}" target="_blank" style="color:#e8c547">IMDb</a>' if imdb_id else ''}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.warning("No results found.")
+    else:
+        st.info("Search for movies, series, or episodes.")
+
+# ====================== LOOKUP ======================
+with tab_lookup:
+    st.markdown('<div class="section-label">Movie Detail Lookup</div>', unsafe_allow_html=True)
+    
+    mode = st.radio("Lookup by", ["Title", "IMDb ID"], horizontal=True, key="lookup_mode")
+    
+    col1, col2 = st.columns([6, 1], gap="small")
+    with col1:
+        val = st.text_input("Enter value", 
+                            placeholder="The Godfather" if mode == "Title" else "tt0068646", 
+                            key="lookup_input")
+    with col2:
+        lookup_go = st.button("Lookup", type="primary", key="lookup_btn")
+
+    if lookup_go and val.strip():
+        with st.spinner("Fetching movie details..."):
+            if mode == "Title":
+                data = api(f"/movie/title/{val.strip()}")
+            else:
+                data = api(f"/movie/imdb/{val.strip()}")
+
+        if data:
+            col_p, col_d = st.columns([1, 2], gap="large")
+            with col_p:
+                st.image(poster(data.get("poster_url")), use_column_width=True)
+            
+            with col_d:
+                st.subheader(data.get("title", "Movie"))
+                st.caption(f"{data.get('year')} • {data.get('runtime')} • {data.get('genre')}")
+                st.write(data.get("plot", "No plot available."))
+                
+                st.metric("IMDb Rating", data.get("imdb_rating", "N/A"))
+                st.write(f"**Director:** {data.get('director', '—')}")
+                st.write(f"**Cast:** {data.get('actors', '—')}")
+    else:
+        st.info("Enter a title or IMDb ID to see full details.")
+
+# ── Footer ─────────────────────────────────────────────────────────────────────
+st.markdown("---")
+st.markdown(
+    "<p style='text-align:center; color:#444466; font-size:0.8rem;'>"
+    "CineMatch • OMDB + TF-IDF</p>",
+    unsafe_allow_html=True
+)

@@ -1,4 +1,3 @@
-
 import os
 import pickle
 from contextlib import asynccontextmanager
@@ -14,18 +13,18 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-# OMDB config
+# ── OMDB config ────────────────────────────────────────────────────────────────
 OMDB_API_KEY: Optional[str] = os.getenv("OMDB_API_KEY")
-OMDB_BASE_URL = "https://www.omdbapi.com/"  
+OMDB_BASE_URL = "https://www.omdbapi.com/"   # single endpoint, always HTTPS
 
-#Pickle paths 
+# ── Pickle paths ───────────────────────────────────────────────────────────────
 BASE_DIR          = os.path.dirname(os.path.abspath(__file__))
 DF_PATH           = os.path.join(BASE_DIR, "df.pkl")
 INDICES_PATH      = os.path.join(BASE_DIR, "indices.pkl")
 TFIDF_MATRIX_PATH = os.path.join(BASE_DIR, "tfidf_metrix.pkl")
 TFIDF_PATH        = os.path.join(BASE_DIR, "tfidf.pkl")
 
-# Global state 
+# ── Global state 
 df:           Optional[pd.DataFrame]   = None
 indices_obj:  Any                      = None
 tfidf_matrix: Any                      = None
@@ -33,10 +32,10 @@ tfidf_obj:    Any                      = None
 TITLE_TO_IDX: Optional[Dict[str, int]] = None
 
 
-# Lifespan 
+# ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load pickled model artefacts once at startup."""
+    
     global df, indices_obj, tfidf_matrix, tfidf_obj, TITLE_TO_IDX
 
     with open(DF_PATH, "rb") as f:
@@ -52,10 +51,10 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("df.pkl must contain a DataFrame with a 'title' column")
 
     TITLE_TO_IDX = build_title_to_idx_map(indices_obj)
-    yield 
+    yield  # app runs here
 
 
-# ── App
+# ── App ────────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Movie Recommender API", version="1.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -67,25 +66,24 @@ app.add_middleware(
 )
 
 
-# Pydantic models
+# ── Pydantic models ────────────────────────────────────────────────────────────
 class OMDBMovieCard(BaseModel):
-    """Lightweight card returned by search (`s` param)."""
+    
     imdb_id:    str
     title:      str
     year:       Optional[str] = None
     poster_url: Optional[str] = None
-    type:       Optional[str] = None  
+    type:       Optional[str] = None   # "movie" | "series" | "episode"
 
 
 class OMDBMovieDetails(BaseModel):
-    """Full detail record returned by title / IMDb-ID lookup."""
     imdb_id:     str
     title:       str
     year:        Optional[str] = None
     rated:       Optional[str] = None
     released:    Optional[str] = None
     runtime:     Optional[str] = None
-    genre:       Optional[str] = None  
+    genre:       Optional[str] = None   # comma-separated string from OMDB
     director:    Optional[str] = None
     actors:      Optional[str] = None
     plot:        Optional[str] = None
@@ -111,20 +109,16 @@ class SearchBundleResponse(BaseModel):
     tfidf_recommendations: List[TFIDFRecItem]
 
 
-# Low-level OMDB helper 
+# ── Low-level OMDB helper ──────────────────────────────────────────────────────
 def _poster(url: Optional[str]) -> Optional[str]:
-    """OMDB already returns full poster URLs; just discard the 'N/A' sentinel."""
+  
     if not url or url.strip().upper() == "N/A":
         return None
     return url
 
 
 async def omdb_get(params: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Send a GET to the single OMDB endpoint with `apikey` injected.
-    Raises HTTPException on network errors, non-200 status, or
-    OMDB's own {"Response":"False"} error envelope.
-    """
+   
     if not OMDB_API_KEY:
         raise HTTPException(status_code=500, detail="OMDB_API_KEY is not set")
 
@@ -158,7 +152,7 @@ async def omdb_get(params: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-# OMDB response parsers 
+# ── OMDB response parsers ──────────────────────────────────────────────────────
 def _parse_details(data: Dict[str, Any]) -> OMDBMovieDetails:
     return OMDBMovieDetails(
         imdb_id     = data.get("imdbID", ""),
@@ -192,15 +186,15 @@ def _parse_card(item: Dict[str, Any]) -> OMDBMovieCard:
     )
 
 
-# OMDB query wrappers 
+# ── OMDB query wrappers ────────────────────────────────────────────────────────
 async def omdb_by_title(title: str, plot: str = "full") -> OMDBMovieDetails:
-    """Best-match lookup by title (`t` param)."""
+    
     data = await omdb_get({"t": title, "type": "movie", "plot": plot})
     return _parse_details(data)
 
 
 async def omdb_by_imdb_id(imdb_id: str, plot: str = "full") -> OMDBMovieDetails:
-    """Exact lookup by IMDb ID (`i` param)."""
+   
     data = await omdb_get({"i": imdb_id, "plot": plot})
     return _parse_details(data)
 
@@ -208,15 +202,12 @@ async def omdb_by_imdb_id(imdb_id: str, plot: str = "full") -> OMDBMovieDetails:
 async def omdb_search(
     query: str, page: int = 1, media_type: str = "movie"
 ) -> Dict[str, Any]:
-    """
-    Title keyword search (`s` param).
-    Raw response: {"Search": [...], "totalResults": "N", "Response": "True"}
-    """
+    
     return await omdb_get({"s": query, "type": media_type, "page": page})
 
 
 async def omdb_search_first(query: str) -> Optional[OMDBMovieCard]:
-    """Return the first search hit as a lightweight card, or None on failure."""
+    
     try:
         data = await omdb_search(query, page=1)
         hits = data.get("Search", [])
@@ -225,11 +216,11 @@ async def omdb_search_first(query: str) -> Optional[OMDBMovieCard]:
         return None
 
 
-# TF-IDF helpers
+# ── TF-IDF helpers ─────────────────────────────────────────────────────────────
 def build_title_to_idx_map(indices: Any) -> Dict[str, int]:
     title_to_idx: Dict[str, int] = {}
     try:
-        for k, v in indices.items():  
+        for k, v in indices.items():   # works for both dict and pd.Series
             title_to_idx[_norm_title(k)] = int(v)
     except Exception:
         raise RuntimeError(
@@ -281,7 +272,7 @@ def tfidf_recommend_title(
     return out
 
 
-# Routes
+# ── Routes ─────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
@@ -293,10 +284,7 @@ async def movie_by_title(
     title: str,
     plot: str = Query("full", pattern="^(short|full)$"),
 ):
-    """
-    Full movie details from OMDB by title.
-    Example: GET /movie/title/Inception
-    """
+    
     return await omdb_by_title(title, plot=plot)
 
 
@@ -305,10 +293,6 @@ async def movie_by_imdb_id(
     imdb_id: str,
     plot: str = Query("full", pattern="^(short|full)$"),
 ):
-    """
-    Full movie details from OMDB by IMDb ID.
-    Example: GET /movie/imdb/tt1375666
-    """
     return await omdb_by_imdb_id(imdb_id, plot=plot)
 
 
@@ -318,10 +302,7 @@ async def search_movies(
     page:  int = Query(1, ge=1, le=100, description="Page number (10 results / page)"),
     type:  str = Query("movie", pattern="^(movie|series|episode)$"),
 ):
-    """
-    Keyword search via OMDB.  Returns up to 10 cards per page.
-    Example: GET /search?query=batman&page=1
-    """
+   
     data = await omdb_search(query=query, page=page, media_type=type)
     hits = data.get("Search", [])
     return [_parse_card(h) for h in hits]
@@ -339,10 +320,7 @@ async def recommend_tfidf(
         ),
     ),
 ):
-    """
-    Content-based TF-IDF recommendations from the local model.
-    Example: GET /recommend/tfidf?title=Inception&top_n=10&enrich=true
-    """
+   
     recs = tfidf_recommend_title(title, top_n=top_n)
     out: List[TFIDFRecItem] = []
     for rec_title, score in recs:
@@ -357,25 +335,15 @@ async def recommend_bundle(
     top_n: int = Query(10, ge=1, le=30),
     plot:  str = Query("short", pattern="^(short|full)$"),
 ):
-    """
-    All-in-one endpoint:
-      1. Fetches OMDB details for the requested title.
-      2. Runs TF-IDF recommendations from the local model.
-      3. Enriches each recommendation with an OMDB card (poster + year).
-
-    OMDB lookup is best-effort — recommendations are still returned even if
-    the title is not found on OMDB.
-
-    Example: GET /recommend/bundle?title=Inception&top_n=10
-    """
-    # Step 1 — OMDB details (non-fatal if title not found)
+   
+   
     details: Optional[OMDBMovieDetails] = None
     try:
         details = await omdb_by_title(title, plot=plot)
     except HTTPException:
         pass
 
-    # Step 2 — TF-IDF recommendations enriched with OMDB cards
+   
     recs = tfidf_recommend_title(title, top_n=top_n)
     items: List[TFIDFRecItem] = []
     for rec_title, score in recs:
