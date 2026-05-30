@@ -6,7 +6,7 @@ import requests
 import streamlit as st
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-API_BASE = "http://localhost:8000"
+API_BASE = "https://movie-recommendation-1gns.onrender.com"
 
 st.set_page_config(
     page_title="CineMatch",
